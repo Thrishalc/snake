@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101a19">
+    <title>Snake — Field Notes</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: ui-rounded, "SF Pro Rounded", "Segoe UI", sans-serif;
+        background: #101a19;
+        color: #f0f3dc;
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        padding: 28px 18px;
+        background:
+          radial-gradient(ellipse at 50% 38%, #253b31 0, transparent 56%),
+          #101a19;
+      }
+
+      main {
+        width: min(100%, 560px);
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: #a7b49b;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(2.4rem, 9vw, 4.1rem);
+        line-height: 0.95;
+        letter-spacing: -0.07em;
+      }
+
+      .intro {
+        margin: 14px 0 24px;
+        color: #b7c1af;
+        font-size: 0.95rem;
+      }
+
+      .game-card {
+        overflow: hidden;
+        padding: 16px;
+        border: 1px solid #405249;
+        border-radius: 22px;
+        background: #1a2823;
+        box-shadow: 0 24px 70px #080f0e99;
+      }
+
+      .hud {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 2px 3px 14px;
+      }
+
+      .score-label {
+        display: block;
+        margin-bottom: 3px;
+        color: #9eafa2;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+      }
+
+      .score-value {
+        color: #e6efc9;
+        font-size: 1.65rem;
+        font-variant-numeric: tabular-nums;
+        font-weight: 750;
+        line-height: 1;
+      }
+
+      #status {
+        color: #afbea9;
+        font-size: 0.82rem;
+        text-align: right;
+      }
+
+      .board {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid #41564b;
+        border-radius: 12px;
+        background: #18251f;
+        line-height: 0;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 1;
+      }
+
+      .overlay {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: #101a19b8;
+        text-align: center;
+        line-height: 1.4;
+        backdrop-filter: blur(3px);
+      }
+
+      .overlay[hidden] { display: none; }
+
+      .overlay-content {
+        max-width: 290px;
+      }
+
+      .overlay h2 {
+        margin: 0 0 8px;
+        font-size: 1.7rem;
+        letter-spacing: -0.04em;
+      }
+
+      .overlay p {
+        margin: 0 0 18px;
+        color: #c4d0bf;
+        font-size: 0.9rem;
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        background: #c6e07c;
+        color: #1b291d;
+        cursor: pointer;
+        font: inherit;
+        font-size: 0.9rem;
+        font-weight: 800;
+        padding: 12px 22px;
+        transition: transform 120ms ease, background 120ms ease;
+      }
+
+      button:hover { background: #d7ed9b; transform: translateY(-1px); }
+      button:focus-visible { outline: 3px solid #f0f3dc; outline-offset: 3px; }
+
+      .controls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 15px 3px 1px;
+      }
+
+      .hint {
+        margin: 0;
+        color: #a5b3a5;
+        font-size: 0.75rem;
+        line-height: 1.5;
+      }
+
+      .dpad {
+        display: grid;
+        grid-template: repeat(2, 34px) / repeat(3, 38px);
+        gap: 3px;
+      }
+
+      .dpad button {
+        display: grid;
+        place-items: center;
+        padding: 0;
+        border: 1px solid #53675a;
+        background: #283a30;
+        color: #e0e9ce;
+        font-size: 1rem;
+        touch-action: manipulation;
+      }
+
+      .dpad button:hover { background: #384d3d; }
+      .dpad .up { grid-area: 1 / 2; }
+      .dpad .left { grid-area: 2 / 1; }
+      .dpad .down { grid-area: 2 / 2; }
+      .dpad .right { grid-area: 2 / 3; }
+
+      @media (min-width: 600px) {
+        .dpad { display: none; }
+        .game-card { padding: 20px; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { transition-duration: 0.01ms !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">A little game for a quiet moment</p>
+      <h1>Snake<span aria-hidden="true">.</span></h1>
+      <p class="intro">Collect the little lights. Keep your eyes on the path.</p>
+
+      <section class="game-card" aria-label="Snake game">
+        <div class="hud">
+          <div>
+            <span class="score-label">Harvest</span>
+            <span class="score-value" id="score" aria-live="polite">00</span>
+          </div>
+          <span id="status" role="status">Ready when you are</span>
+        </div>
+
+        <div class="board">
+          <canvas id="game" width="600" height="600" aria-label="Snake game board, 20 by 20 grid"></canvas>
+          <div class="overlay" id="overlay">
+            <div class="overlay-content">
+              <h2 id="overlay-title">Ready to wander?</h2>
+              <p id="overlay-copy">Use the arrow keys or WASD to guide your snake.</p>
+              <button id="start" type="button">Start game</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="controls">
+          <p class="hint">Arrow keys / WASD to move<br>Space to pause</p>
+          <div class="dpad" aria-label="Touch controls">
+            <button class="up" type="button" data-direction="up" aria-label="Move up">↑</button>
+            <button class="left" type="button" data-direction="left" aria-label="Move left">←</button>
+            <button class="down" type="button" data-direction="down" aria-label="Move down">↓</button>
+            <button class="right" type="button" data-direction="right" aria-label="Move right">→</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      (() => {
+        const canvas = document.querySelector("#game");
+        const context = canvas.getContext("2d");
+        const scoreLabel = document.querySelector("#score");
+        const statusLabel = document.querySelector("#status");
+        const overlay = document.querySelector("#overlay");
+        const overlayTitle = document.querySelector("#overlay-title");
+        const overlayCopy = document.querySelector("#overlay-copy");
+        const startButton = document.querySelector("#start");
+
+        const size = 20;
+        const cellSize = canvas.width / size;
+        const directions = {
+          up: { x: 0, y: -1 },
+          down: { x: 0, y: 1 },
+          left: { x: -1, y: 0 },
+          right: { x: 1, y: 0 }
+        };
+        const keyDirections = {
+          ArrowUp: "up", w: "up", W: "up",
+          ArrowDown: "down", s: "down", S: "down",
+          ArrowLeft: "left", a: "left", A: "left",
+          ArrowRight: "right", d: "right", D: "right"
+        };
+
+        let grid;
+        let snake;
+        let direction;
+        let nextDirection;
+        let food;
+        let score;
+        let state = "ready";
+        let lastFrame = 0;
+        let elapsed = 0;
+        let stepDuration = 145;
+
+        function reset() {
+          grid = Array.from({ length: size }, () => Array(size).fill(""));
+          snake = [
+            { x: 8, y: 10 },
+            { x: 7, y: 10 },
+            { x: 6, y: 10 }
+          ];
+          direction = directions.right;
+          nextDirection = direction;
+          score = 0;
+          stepDuration = 145;
+          elapsed = 0;
+          scoreLabel.textContent = "00";
+          placeFood();
+          updateGrid();
+          draw();
+        }
+
+        function updateGrid() {
+          grid = Array.from({ length: size }, () => Array(size).fill(""));
+          for (const segment of snake) grid[segment.y][segment.x] = "snake";
+          if (food) grid[food.y][food.x] = "food";
+        }
+
+        function placeFood() {
+          const emptyCells = [];
+          for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+              if (!snake.some(segment => segment.x === x && segment.y === y)) {
+                emptyCells.push({ x, y });
+              }
+            }
+          }
+          food = emptyCells.length
+            ? emptyCells[Math.floor(Math.random() * emptyCells.length)]
+            : null;
+        }
+
+        function draw() {
+          context.clearRect(0, 0, canvas.width, canvas.height);
+          context.fillStyle = "#18251f";
+          context.fillRect(0, 0, canvas.width, canvas.height);
+
+          context.strokeStyle = "#26372e";
+          context.lineWidth = 1;
+          for (let line = 1; line < size; line++) {
+            const position = line * cellSize;
+            context.beginPath();
+            context.moveTo(position, 0);
+            context.lineTo(position, canvas.height);
+            context.moveTo(0, position);
+            context.lineTo(canvas.width, position);
+            context.stroke();
+          }
+
+          for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+              if (grid[y][x] === "food") drawFood(x, y);
+              if (grid[y][x] === "snake") drawSegment(x, y);
+            }
+          }
+
+          if (snake.length) drawEyes(snake[0]);
+        }
+
+        function drawSegment(x, y) {
+          const inset = 2.5;
+          const radius = 7;
+          const head = snake[0].x === x && snake[0].y === y;
+          context.fillStyle = head ? "#d9ed9a" : "#91bd70";
+          context.beginPath();
+          context.roundRect(
+            x * cellSize + inset,
+            y * cellSize + inset,
+            cellSize - inset * 2,
+            cellSize - inset * 2,
+            radius
+          );
+          context.fill();
+        }
+
+        function drawEyes(head) {
+          const centerX = head.x * cellSize + cellSize / 2;
+          const centerY = head.y * cellSize + cellSize / 2;
+          const forward = direction;
+          const side = { x: -forward.y, y: forward.x };
+          context.fillStyle = "#26372e";
+          for (const offset of [-1, 1]) {
+            const eyeX = centerX + forward.x * 5 + side.x * offset * 4;
+            const eyeY = centerY + forward.y * 5 + side.y * offset * 4;
+            context.beginPath();
+            context.arc(eyeX, eyeY, 1.8, 0, Math.PI * 2);
+            context.fill();
+          }
+        }
+
+        function drawFood(x, y) {
+          const centerX = x * cellSize + cellSize / 2;
+          const centerY = y * cellSize + cellSize / 2;
+          context.shadowColor = "#f4a66a";
+          context.shadowBlur = 14;
+          context.fillStyle = "#f4a66a";
+          context.beginPath();
+          context.arc(centerX, centerY, cellSize * 0.27, 0, Math.PI * 2);
+          context.fill();
+          context.shadowBlur = 0;
+          context.fillStyle = "#f8d78e";
+          context.beginPath();
+          context.arc(centerX - 2, centerY - 2, cellSize * 0.08, 0, Math.PI * 2);
+          context.fill();
+        }
+
+        function showOverlay(title, copy, buttonText) {
+          overlayTitle.textContent = title;
+          overlayCopy.textContent = copy;
+          startButton.textContent = buttonText;
+          overlay.hidden = false;
+        }
+
+        function begin() {
+          if (state === "over") reset();
+          state = "playing";
+          statusLabel.textContent = "Find the next light";
+          overlay.hidden = true;
+          lastFrame = 0;
+          requestAnimationFrame(frame);
+        }
+
+        function finish() {
+          state = "over";
+          statusLabel.textContent = "The path ends here";
+          showOverlay("A good little journey.", `You collected ${score} ${score === 1 ? "light" : "lights"}. Ready for another?`, "Play again");
+        }
+
+        function togglePause() {
+          if (state === "playing") {
+            state = "paused";
+            statusLabel.textContent = "Paused";
+            showOverlay("Take your time.", "Your path is waiting right where you left it.", "Keep going");
+          } else if (state === "paused") {
+            begin();
+          }
+        }
+
+        function changeDirection(name) {
+          const candidate = directions[name];
+          if (!candidate) return;
+          if (state === "ready" || state === "over") begin();
+          if (state !== "playing") return;
+          if (candidate.x + direction.x === 0 && candidate.y + direction.y === 0) return;
+          nextDirection = candidate;
+        }
+
+        function advance() {
+          direction = nextDirection;
+          const head = snake[0];
+          const nextHead = { x: head.x + direction.x, y: head.y + direction.y };
+          const eating = food && nextHead.x === food.x && nextHead.y === food.y;
+          const hitsWall =
+            nextHead.x < 0 || nextHead.x >= size ||
+            nextHead.y < 0 || nextHead.y >= size;
+          const bodyToCheck = eating ? snake : snake.slice(0, -1);
+          const hitsBody = bodyToCheck.some(
+            segment => segment.x === nextHead.x && segment.y === nextHead.y
+          );
+
+          if (hitsWall || hitsBody) {
+            finish();
+            return;
+          }
+
+          snake.unshift(nextHead);
+          if (eating) {
+            score++;
+            scoreLabel.textContent = String(score).padStart(2, "0");
+            stepDuration = Math.max(75, 145 - Math.floor(score / 4) * 8);
+            placeFood();
+            if (!food) {
+              state = "over";
+              statusLabel.textContent = "A perfect harvest";
+              showOverlay("Every space, filled.", `You collected all ${score} lights.`, "Play again");
+            }
+          } else {
+            snake.pop();
+          }
+
+          updateGrid();
+          draw();
+        }
+
+        function frame(timestamp) {
+          if (state !== "playing") return;
+          if (!lastFrame) lastFrame = timestamp;
+          elapsed += timestamp - lastFrame;
+          lastFrame = timestamp;
+          while (elapsed >= stepDuration && state === "playing") {
+            elapsed -= stepDuration;
+            advance();
+          }
+          if (state === "playing") requestAnimationFrame(frame);
+        }
+
+        document.addEventListener("keydown", event => {
+          if (keyDirections[event.key]) {
+            event.preventDefault();
+            changeDirection(keyDirections[event.key]);
+          } else if (event.code === "Space") {
+            event.preventDefault();
+            togglePause();
+          }
+        });
+
+        startButton.addEventListener("click", begin);
+
+        document.querySelectorAll("[data-direction]").forEach(button => {
+          button.addEventListener("click", () => changeDirection(button.dataset.direction));
+        });
+
+        reset();
+      })();
+    </script>
+  </body>
+</html>
